@@ -1,0 +1,11 @@
+{
+    "require": {
+        "phpunit/phpunit": "4.8.*",
+        "nesbot/carbon": "^1.33"
+    },
+    "autoload": {
+        "psr-4": {
+            "MatrixAgentsAPI\\": "matrixAgentsAPI/"
+        }
+    }
+}

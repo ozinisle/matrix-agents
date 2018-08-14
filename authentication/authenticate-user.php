@@ -1,10 +1,11 @@
 <?php 
 
-require_once('../lib/securityModule/securityAuthentication.php');
+include('../vendor/autoload.php');
 
-use MatrixSecurityAuthentication\MatrixAuthenticator ;
+use MatrixAgentsAPI\Security\Authenticator as MatrixAuth;
 
-    echo MatrixSecurityAuthentication\MatrixAuthenticator::login();
-
+session_start();
+$authenticator = new MatrixAuth();
+echo $authenticator->login();
 
 ?>
