@@ -1,6 +1,9 @@
 <?php
 namespace MatrixAgentsAPI\Utilities;
 
+use phpDocumentor\Reflection\Types\Boolean;
+
+
 class EventLogger
 {
     private $regularInfoLogEvent = true;
@@ -11,10 +14,23 @@ class EventLogger
 
     private $appLoggerConfig = null;
 
+    private function getEventLogger() : EventLogger
+    {
+        return $this;
+    }
+
     public function log(string $logText)
     {
         //write code to log the event
         echo $logText;
+    }
+
+    public function debug(string $logText, bool $maskFlag)
+    {
+        if (!$maskFlag && $_SESSION['debug_mode']) {
+            $this->getEventLogger()::debugEvent();
+            $this->getEventLogger()::log($logText . PHP_EOL);
+        }
     }
 
     public function getAppLoggerConfig()
@@ -55,7 +71,7 @@ class EventLogger
         $this->securityEvent = true;
         $this->regularInfoLogEvent = false;
 
-        //do pre-requisites for a debug event here 
+        //do pre-requisites for a security event here 
 
         return $this;
     }
@@ -65,7 +81,7 @@ class EventLogger
         $this->errorEvent = true;
         $this->regularInfoLogEvent = false;
 
-        //do pre-requisites for a debug event here 
+        //do pre-requisites for a error event here 
 
         return $this;
     }
@@ -75,7 +91,7 @@ class EventLogger
         $this->warningEvent = true;
         $this->regularInfoLogEvent = false;
 
-        //do pre-requisites for a debug event here 
+        //do pre-requisites for a warning event here 
 
         return $this;
     }

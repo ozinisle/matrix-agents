@@ -2,98 +2,156 @@
 
 use MatrixAgentsAPI\Security\JWT\Token;
 use MatrixAgentsAPI\Utilities\EventLogger;
+use MatrixAgentsAPI\Security\Encryption\OpenSSLEncryption;
 
 class Authenticator
 {
     private $logger;
     private $authenticatedUserName = '';
+    private $opensslEncryption;
+
+    const MASK_LOG_TRUE = true;
 
     public function __construct()
     {
         $this->logger = new EventLogger();
+        $this->opensslEncryption = new OpenSSLEncryption();
     }
 
     public function login() : string
     {
-        //Start :: gather data relevant to the login attempt
-        //get the site from which the login request has been triggered
-        $referer = $_SERVER['HTTP_REFERER'];
 
-        //compiler gets here only if the  request is from a valid origin
-        //get the request body to extract the parameters posted to the request
-        $request_body = file_get_contents('php://input');
+        try {
+            //initializing default login response to aunthentication failure scenario
+            $loginResponseToBeSent = "{\"isAuthenticate\":\"false\"}"; 
+            
+            //Start :: gather data relevant to the login attempt
+            //get the site from which the login request has been triggered
+            $referer = $_SERVER['HTTP_REFERER'];
 
-        //get the parameters posted in the request
-        $data = json_decode($request_body);
-        $username = $data->username;
-        $password = $data->password;
-        //END :: gather data relevant to the login attempt
+            //compiler gets here only if the  request is from a valid origin
+            //get the request body to extract the parameters posted to the request
+            $request_body = file_get_contents('php://input');
 
-        //get properties as a section segrated array
-        $PROCESS_SECTIONS = true;
+            //get properties as a section segrated array
+            $PROCESS_SECTIONS = true;
         
-        //print current working directory -- debug purpose
-        //echo getcwd() . PHP_EOL;
+            //print current working directory -- debug purpose
+            //echo getcwd() . PHP_EOL;
+
+            //get app properties
+            $matrix_agents_properties = parse_ini_file(realpath("../matrix-agents-properties.ini"), $PROCESS_SECTIONS);
+
+            $matrixAppFlags = $matrix_agents_properties["matrix-app-flags"];
+            $_SESSION['debug_mode'] = $matrixAppFlags["debug_mode"];
+
+            $matrixCommChannelPassPhrase = $matrix_agents_properties["matrix-comm-channel-pass-phrase"];
+            $_SESSION['request_decryption_pass_phrase'] = $matrixCommChannelPassPhrase["request_decryption_pass_phrase"];
+            $_SESSION['response_encryption_pass_phrase'] = $matrixCommChannelPassPhrase["response_encryption_pass_phrase"];
+
+            $this->logger->debug('app debug mode set to >>>' . $_SESSION['debug_mode'] . PHP_EOL, self::MASK_LOG_TRUE);
+
+            $this->logger->debug('login payload >>> ' . $request_body, self::MASK_LOG_TRUE);
+
+        //Following decryption procedure shall be used for openssl mechanism for php7.2 or higher        
+            $data = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
+
+            if (empty($data)) {
+
+                $this->logger
+                    ->errorEvent()
+                    ->log('Invalid request. No request body information found');
+                return $loginResponseToBeSent;
+            }
+
+        // START : mcrypt_decrypt method
+        // Following decryption procedure shall be used for mcrypt_decrypt mechanism for php 5.2 or less
+        // $key = pack('H*', "bcb04b7e103a0cd8b54763051cef08bc55abe029fdebae5e1d417e2ffb2a00a3");
+        // $ciphertext_dec = base64_decode($request_body);
+        // $iv_dec = pack('H*', "101112131415161718191a1b1c1d1e1f");
+
+        // $ciphertext_dec = substr($ciphertext_dec, 16);
+        // $decrypted_requet_body = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, $key, $ciphertext_dec, MCRYPT_MODE_CBC, $iv_dec);
         
-        //get app properties
-        $matrix_agents_properties = parse_ini_file(realpath("../matrix-agents-properties.ini"), $PROCESS_SECTIONS);
+        // get the parameters posted in the request
+        // $data = json_decode($decrypted_request_body);
+        // END : mcrypt_decrypt method
+
+            $username = $data->username;
+            $password = $data->password;
+        //END :: gather data relevant to the login attempt         
         
         //get the allowed origins list
-        $allowedOrigins = $matrix_agents_properties["matrix-login-allowed-from-origins"];
+            $allowedOrigins = $matrix_agents_properties["matrix-login-allowed-from-origins"];        
 
         //loop through the allowed origins and allow user to authenticate only if the origin is good
-        $canAuthenticate = false;
-        $referer_upper = strtoupper($referer);
-        foreach ($allowedOrigins as $origin) {
-            $origin_upper = strtoupper($origin);
-            if ($origin_upper === substr($referer_upper, 0, strlen($origin_upper))) {
-                $canAuthenticate = true;
-                break;
+            $canAuthenticate = false;
+            $referer_upper = strtoupper($referer);
+            foreach ($allowedOrigins as $origin) {
+                $origin_upper = strtoupper($origin);
+                if ($origin_upper === substr($referer_upper, 0, strlen($origin_upper))) {
+                    $canAuthenticate = true;
+                    break;
+                }
             }
-        }
-        unset($origin);
+            unset($origin);
 
+            
         //dont let user to authenticate if the request did not come from allowed origins list
-        if (!$canAuthenticate) {
-            $this->logger
-                ->securityEvent()
-                ->log("Alert :: Login has been attempted from url '" . $referer . "' using the following credentials, " . PHP_EOL .
-                    " username :" . $username . "," . PHP_EOL .
-                    " password :" . $password . PHP_EOL .
-                    " The request that was submitted is as follows >>> " . PHP_EOL .
-                    $request_body);
+            if (!$canAuthenticate) {
+                $this->logger
+                    ->securityEvent()
+                    ->log("Alert :: Login has been attempted from url '" . $referer . "' using the following credentials, " . PHP_EOL .
+                        " username :" . $username . "," . PHP_EOL .
+                        " password :" . $password . PHP_EOL .
+                        " The request that was submitted is as follows >>> " . PHP_EOL .
+                        $request_body);
 
-            return "{\"isAuthenticate\":\"false\"}";
-        }
+
+                return $loginResponseToBeSent;
+            }
 
         //validate the data against the information stored in the data base 
-        if ($this->validateUserLoginWithDBData($username, $password) == true) {
+
+            if ($this->validateUserLoginWithDBData($username, $password) == true) {
             //if validation is succeeds authenticate the user and send an JWT token for future communication authentication
 
-            $userId = "123";
-            $secretKey = $this->getJwtSecretKey();
-            $expiration = date("Y-m-d H:i:s", strtotime('+2 hours'));
-            $issuer = "http://www.techdotmasterpiece.com";
-            $audience = "http://www.techdotmasterpiece.com/matrix/login";
-            $subject = 'user-session-authorization';
+                $userId = "123";
+                $secretKey = $this->getJwtSecretKey();
+                $expiration = date("Y-m-d H:i:s", strtotime('+2 hours'));
+                $issuer = "http://www.techdotmasterpiece.com";
+                $audience = "http://www.techdotmasterpiece.com/matrix/login";
+                $subject = 'user-session-authorization';
 
-            $token = Token::getToken($userId, $secretKey, $expiration, $issuer, $audience, $subject);
+                $token = Token::getToken($userId, $secretKey, $expiration, $issuer, $audience, $subject);
 
-            $_SESSION['secretKey'] = $secretKey;
+                $_SESSION['secretKey'] = $secretKey;
 
-            return "{\"isAuthenticated\":\"true\",\"token\":\"" . $token .
-                "\",\"authenticatedUserName\":\"" . $this->authenticatedUserName . "\"}"; //,\"referer\":\"" . $referer . "\"}";
-        } else {
-            $this->logger
-                ->securityEvent()
-                ->warningEvent()
-                ->log("Login attempt failed for the following credentials, " . PHP_EOL .
-                    " username :" . $username . "," . PHP_EOL .
-                    " password :" . $password . PHP_EOL .
-                    " The request that was submitted is as follows >>> " . PFP_EOL .
-                    $request_body);
+                $loginResponseToBeSent = "{\"isAuthenticated\":\"true\",\"token\":\"" . $token .
+                    "\",\"authenticatedUserName\":\"" . $this->authenticatedUserName . "\"}"; //,\"referer\":\"" . $referer . "\"}";
+            } else {
+                $this->logger
+                    ->securityEvent()
+                    ->warningEvent()
+                    ->log("Login attempt failed for the following credentials, " . PHP_EOL .
+                        " username :" . $username . "," . PHP_EOL .
+                        " password :" . $password . PHP_EOL .
+                        " The request that was submitted is as follows >>> " . PFP_EOL .
+                        $request_body);
             //if validation fails dont let the user to authenticate
-            return "{\"isAuthenticated\":\"false\"}";
+                $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
+            }
+
+
+        } catch (Exception $e) {
+            $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
+            $this->logger
+                ->errorEvent()
+                ->log('Caught exception: ' . $e->getMessage() . "\n");
+
+        }
+        finally {
+            return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $loginResponseToBeSent);
         }
     }
 
