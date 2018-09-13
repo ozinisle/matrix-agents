@@ -22,7 +22,13 @@ class EventLogger
     public function log(string $logText)
     {
         //write code to log the event
-        echo $logText;
+        //in my case this outputs the logs to file:///D:/xampp/apache/logs/error.log, which can be opened on the browser
+        file_put_contents('php://stderr', $logText);
+
+        //following code when uncommented will add logs to responses sent to the browser
+        //thus causing issues with json formatted response etc
+        //use it at your descrition. 
+        //echo $logText;        
     }
 
     public function debug(string $logText, bool $maskFlag)
