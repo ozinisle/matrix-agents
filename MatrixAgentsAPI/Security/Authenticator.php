@@ -11,6 +11,9 @@ class Authenticator
     private $authenticatedUserName = '';
     private $opensslEncryption;
 
+    private $matrix_agents_properties;
+    private $login_pay_load = null;
+
     const MASK_LOG_TRUE = false;
 
     public function __construct()
@@ -19,43 +22,43 @@ class Authenticator
         $this->opensslEncryption = new OpenSSLEncryption();
     }
 
-    public function register() : string
+    public function register(): string
     {
 
         //create the response object
         $registrationResponse = new MatrixRegistrationResponseModel();
 
         try {
-            $this->logger->debug('Authenticator::into method register', self::MASK_LOG_TRUE);
-        
+            $this->logger->debug('into method register >>> ', self::MASK_LOG_TRUE);
+
             //Start :: gather data relevant to the login attempt
             //initialize session
             $this->initializeSession();
 
-            
-            //get the site from which the login request has been triggered
-            $referer = $_SERVER['HTTP_REFERER'];
-
             //compiler gets here only if the  request is from a valid origin
             //get the request body to extract the parameters posted to the request
-            $registrationRequest = $this->getRequest();
+            $request_body = $this->getRequestBody();
 
-           
-            /*$dbh = new PDO("mysql:host=your_host_name;dbname=your_db_name", $user, $pass);
-            $stmt = $dbh->prepare("SELECT username from my_table where username = ':name'");
-            $stmt->bindParam(":name", "bob");
-            $stmt->execute();
+            $decryptedRegistrationRequest = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
 
-            if($stmt->rowCount() > 0)
-            {
-                // row exists. do whatever you want to do.
-            }*/
+            if (empty($decryptedRegistrationRequest)) {
+                $this->logger
+                    ->errorEvent()
+                    ->log('Invalid request. No request body information found');
+                return $decryptedRegistrationRequest;
+            }
 
+
+
+            if ($decryptedRegistrationRequest->appName === "iRemember") {
+                $this->logger->debug(' ****** Register with iRemember app ****** user name>>> ***' .
+                    $decryptedRegistrationRequest->username
+                    . '**** password **** ' . $decryptedRegistrationRequest->password, self::MASK_LOG_TRUE);
+            }
 
             $registrationResponse->setStatus('SUCCESS')
                 ->setDisplayMessage('User registration is successful')
                 ->setErrorMessage('');
-
         } catch (Exception $e) {
 
             $registrationResponse->setStatus('FAILURE')
@@ -65,40 +68,36 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
-        }
-        finally {
+        } finally {
             $this->logger->debug(' executing finally block in register() method', self::MASK_LOG_TRUE);
             return $this->getEncryptedResponse($registrationResponse->getJsonString());
         }
     }
 
-    private function getRequest() : string
+    private function getRequest(): string
     {
+        $decryptedRequest = null;
         try {
             $this->logger->debug(' into method Authenticator::getRequest()', self::MASK_LOG_TRUE);
 
-        //compiler gets here only if the  request is from a valid origin
-        //get the request body to extract the parameters posted to the request
-            $request_body = file_get_contents('php://input');
+            //compiler gets here only if the  request is from a valid origin
+            //get the request body to extract the parameters posted to the request
+            $request_body = $this->getRequestBody();
 
             $decryptedRequest = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
 
             $this->logger->debug(' decrypted request payload is >>>' . json_encode($decryptedRequest), self::MASK_LOG_TRUE);
-
-            $this->logger->debug(' completed method Authenticator::getRequest()', self::MASK_LOG_TRUE);
-            return $decryptedRequest;
         } catch (Exception $e) {
 
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
-        return null;
+        $this->logger->debug('>>> completed method Authenticator::getRequest()', self::MASK_LOG_TRUE);
+        return $decryptedRequest;
     }
 
-    private function getEncryptedResponse($response) : string
+    private function getEncryptedResponse($response): string
     {
         try {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $response);
@@ -107,44 +106,54 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
 
         return null;
     }
 
-    public function login() : string
+    public function login(): string
     {
 
         try {
+
             //initializing default login response to aunthentication failure scenario
-            $loginResponseToBeSent = "{\"isAuthenticate\":\"false\"}"; 
-            
+            $loginResponseToBeSent = "{\"isAuthenticate\":\"false\"}";
+
             //Start :: gather data relevant to the login attempt
             //get the site from which the login request has been triggered
             $referer = $_SERVER['HTTP_REFERER'];
-        
+
             //print current working directory -- debug purpose
             //echo getcwd() . PHP_EOL;
 
             //initialize session
             $this->initializeSession();
 
-            $this->logger->debug('app debug mode set to >>>' . $_SESSION['debug_mode'] . PHP_EOL, self::MASK_LOG_TRUE);
+            $request_body = $this->getRequestBody();
 
+            $this->logger->debug(PHP_EOL . 'app debug mode set to >>>' . $_SESSION['debug_mode'], self::MASK_LOG_TRUE);
+            $this->logger->debug('into login method ', self::MASK_LOG_TRUE);
             $this->logger->debug('login payload >>> ' . $request_body, self::MASK_LOG_TRUE);
 
             //Following decryption procedure shall be used for openssl mechanism for php7.2 or higher        
-            $data = $this->getRequest();
+            //$reqData = $this->getRequest();
+            $this->logger->debug('>>> $_SESSION[\'request_decryption_pass_phrase\']>>> ' . $_SESSION['request_decryption_pass_phrase'], self::MASK_LOG_TRUE);
+            $this->logger->debug('>>> $request_body >>> ' . $request_body, self::MASK_LOG_TRUE);
 
-            if (empty($data)) {
+            $decryptedRequest = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
+            // $this->logger->debug('decryptedRequest is >>> ' . var_dump($decryptedRequest), self::MASK_LOG_TRUE);
+            if (empty($decryptedRequest)) {
+
                 $this->logger
                     ->errorEvent()
                     ->log('Invalid request. No request body information found');
                 return $loginResponseToBeSent;
             }
 
-        // START : mcrypt_decrypt method
+
+            // $this->logger->debug('login getRequest() >>> ' . $decryptedRequest, self::MASK_LOG_TRUE);
+
+            // START : mcrypt_decrypt method
             // Following decryption procedure shall be used for mcrypt_decrypt mechanism for php 5.2 or less
             // $key = pack('H*', "bcb04b7e103a0cd8b54763051cef08bc55abe029fdebae5e1d417e2ffb2a00a3");
             // $ciphertext_dec = base64_decode($request_body);
@@ -152,48 +161,54 @@ class Authenticator
 
             // $ciphertext_dec = substr($ciphertext_dec, 16);
             // $decrypted_requet_body = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, $key, $ciphertext_dec, MCRYPT_MODE_CBC, $iv_dec);
-            
+
             // get the parameters posted in the request
             // $data = json_decode($decrypted_request_body);
             // END : mcrypt_decrypt method
 
-            $username = $data->username;
-            $password = $data->password;
-        //END :: gather data relevant to the login attempt         
-        
+            $username = $decryptedRequest->username;
+            $password = $decryptedRequest->password;
+            //END :: gather data relevant to the login attempt         
+
             //get the allowed origins list
-            $allowedOrigins = $matrix_agents_properties["matrix-login-allowed-from-origins"];        
+            $allowedOrigins = $this->matrix_agents_properties["matrix-login-allowed-from-origins"];
+
+            $this->logger->debug('>>> checking for allowed origins ', self::MASK_LOG_TRUE);
+
+
+            // since this is going to be a mobile application
+            // this can activate custom check cannot help :()
 
             //loop through the allowed origins and allow user to authenticate only if the origin is good
-            $canAuthenticate = false;
-            $referer_upper = strtoupper($referer);
-            foreach ($allowedOrigins as $origin) {
-                $origin_upper = strtoupper($origin);
-                if ($origin_upper === substr($referer_upper, 0, strlen($origin_upper))) {
-                    $canAuthenticate = true;
-                    break;
-                }
-            }
-            unset($origin);
+            // $canAuthenticate = false;
+            // $referer_upper = strtoupper($referer);
+            // foreach ($allowedOrigins as $origin) {
+            //     $origin_upper = strtoupper($origin);
+            //     if ($origin_upper === substr($referer_upper, 0, strlen($origin_upper))) {
+            //         $canAuthenticate = true;
+            //         break;
+            //     }
+            // }
+            // unset($origin);
 
-            
-        //dont let user to authenticate if the request did not come from allowed origins list
-            if (!$canAuthenticate) {
-                $this->logger
-                    ->securityEvent()
-                    ->log("Alert :: Login has been attempted from url '" . $referer . "' using the following credentials, " . PHP_EOL .
-                        " username :" . $username . "," . PHP_EOL .
-                        " password :" . $password . PHP_EOL .
-                        " The request that was submitted is as follows >>> " . PHP_EOL .
-                        $request_body);
+            // $this->logger->debug('>>> finished - canAuthenticate is >>> ' . $canAuthenticate, self::MASK_LOG_TRUE);
+            // //dont let user to authenticate if the request did not come from allowed origins list
+            // if (!$canAuthenticate) {
+            //     $this->logger
+            //         ->securityEvent()
+            //         ->log("Alert :: Login has been attempted from url '" . $referer . "' using the following credentials, " . PHP_EOL .
+            //             " username :" . $username . "," . PHP_EOL .
+            //             " password :" . $password . PHP_EOL .
+            //             " The request that was submitted is as follows >>> " . PHP_EOL .
+            //             $request_body);
 
-                return $loginResponseToBeSent;
-            }
+            //     return $loginResponseToBeSent;
+            // }
 
-        //validate the data against the information stored in the data base 
+            //validate the data against the information stored in the data base 
 
             if ($this->validateUserLoginWithDBData($username, $password) == true) {
-            //if validation is succeeds authenticate the user and send an JWT token for future communication authentication
+                //if validation is succeeds authenticate the user and send an JWT token for future communication authentication
 
                 $userId = "123";
                 $secretKey = $this->getJwtSecretKey();
@@ -208,6 +223,8 @@ class Authenticator
 
                 $loginResponseToBeSent = "{\"isAuthenticated\":\"true\",\"token\":\"" . $token .
                     "\",\"authenticatedUserName\":\"" . $this->authenticatedUserName . "\"}"; //,\"referer\":\"" . $referer . "\"}";
+
+                $this->logger->debug('>>> valid login detected >>> ' . $loginResponseToBeSent, self::MASK_LOG_TRUE);
             } else {
                 $this->logger
                     ->securityEvent()
@@ -217,24 +234,26 @@ class Authenticator
                         " password :" . $password . PHP_EOL .
                         " The request that was submitted is as follows >>> " . PFP_EOL .
                         $request_body);
-            //if validation fails dont let the user to authenticate
+                //if validation fails dont let the user to authenticate
                 $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
             }
-
-
         } catch (Exception $e) {
             $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
-
-        }
-        finally {
+                ->log('Caught exception: ');
+            $this->logger
+                ->errorEvent()
+                ->log($e->getMessage());
+            $this->logger
+                ->errorEvent()
+                ->log(PHP_EOL);
+        } finally {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $loginResponseToBeSent);
         }
     }
 
-    public function logoff() : string
+    public function logoff(): string
     {
         if (isset($_SESSION['secretKey'])) {
 
@@ -256,7 +275,6 @@ class Authenticator
                     return "FAILURE";
                 }
             }
-
         } else {
             //get the request body to extract the parameters posted to the request
             $request_body = file_get_contents('php://input');
@@ -279,18 +297,18 @@ class Authenticator
 
             //get properties as a section segrated array
             $PROCESS_SECTIONS = true;
-        
-            //get app properties
-            $matrix_agents_properties = parse_ini_file(realpath('../matrix-agents-properties.ini'), $PROCESS_SECTIONS);
 
-            $matrixAppFlags = $matrix_agents_properties['matrix-app-flags'];
+            //get app properties
+            $this->matrix_agents_properties = parse_ini_file(realpath('../matrix-agents-properties.ini'), $PROCESS_SECTIONS);
+
+            $matrixAppFlags = $this->matrix_agents_properties['matrix-app-flags'];
             $_SESSION['debug_mode'] = $matrixAppFlags['debug_mode'];
 
-            $matrixCommChannelPassPhrase = $matrix_agents_properties['matrix-comm-channel-pass-phrase'];
+            $matrixCommChannelPassPhrase = $this->matrix_agents_properties['matrix-comm-channel-pass-phrase'];
             $_SESSION['request_decryption_pass_phrase'] = $matrixCommChannelPassPhrase['request_decryption_pass_phrase'];
             $_SESSION['response_encryption_pass_phrase'] = $matrixCommChannelPassPhrase['response_encryption_pass_phrase'];
 
-            $matrixDatabaseConfiguration = $matrix_agents_properties['database-configuration'];
+            $matrixDatabaseConfiguration = $this->matrix_agents_properties['database-configuration'];
             $_SESSION['matrix_database_name'] = $matrixDatabaseConfiguration['matrix_database_name'];
 
             $this->logger->debug(' completed method Authenticator::initializeSession()', self::MASK_LOG_TRUE);
@@ -299,24 +317,21 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
     }
 
-    private function validateUserLoginWithDBData($username, $password) : bool
+    private function validateUserLoginWithDBData($username, $password): bool
     {
         try {
             $this->logger->debug(' into method Authenticator::validateUserLoginWithDBData()', self::MASK_LOG_TRUE);
             //write code to validate user login info with data stored in db
             $this->authenticatedUserName = "Vishwa Muneeswaran";
             $this->logger->debug(' completed method Authenticator::validateUserLoginWithDBData()', self::MASK_LOG_TRUE);
-
         } catch (Exception $e) {
 
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
         return true;
     }
@@ -358,14 +373,11 @@ class Authenticator
             $this->logger->debug(' completed method Authenticator::getJWT()', self::MASK_LOG_TRUE);
 
             return $jwt;
-
-
         } catch (Exception $e) {
 
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
     }
 
@@ -487,9 +499,7 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-
         }
-
     }
 
     /** 
@@ -543,6 +553,22 @@ class Authenticator
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
         }
     }
-}
 
-?>
+    private function getRequestBody()
+    {
+        try {
+            //compiler gets here only if the  request is from a valid origin
+            //get the request body to extract the parameters posted to the request
+            if ($this->login_pay_load === null) {
+                $this->login_pay_load = file_get_contents('php://input');
+            }
+            $this->logger->debug(' $json>>>' . $this->login_pay_load, self::MASK_LOG_TRUE);
+        } catch (Exception $e) {
+            $this->logger
+                ->errorEvent()
+                ->log('Caught exception: ' . $e->getMessage() . "\n");
+        } finally {
+            return $this->login_pay_load;
+        }
+    }
+}
