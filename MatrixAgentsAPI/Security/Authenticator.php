@@ -56,6 +56,9 @@ class Authenticator
                     . '**** password **** ' . $decryptedRegistrationRequest->password, self::MASK_LOG_TRUE);
             }
 
+            //techdotm_iRemNRMLSub
+            //1PqD-(bTF[_3
+
             $registrationResponse->setStatus('SUCCESS')
                 ->setDisplayMessage('User registration is successful')
                 ->setErrorMessage('');
