@@ -14,7 +14,7 @@ class EventLogger
 
     private $appLoggerConfig = null;
 
-    private function getEventLogger(): EventLogger
+    private function getEventLogger() : EventLogger
     {
         return $this;
     }
@@ -47,7 +47,7 @@ class EventLogger
             //get properties as a section segrated array
             $PROCESS_SECTIONS = true;
             //get app properties
-            $matrix_agents_properties = parse_ini_file(realpath("../matrix-agents-properties.ini"), $PROCESS_SECTIONS);
+            $matrix_agents_properties = parse_ini_file(realpath("../i-remember-properties.ini"), $PROCESS_SECTIONS);
             //get the matrix log config info from the properties file
             $this->appLoggerConfig = $matrix_agents_properties["matrix-Log-config"];
         }
@@ -55,14 +55,14 @@ class EventLogger
         return $this->appLoggerConfig;
     }
 
-    public function setAppLoggerConfig($matrix_agents_properties): EventLogger
+    public function setAppLoggerConfig($matrix_agents_properties) : EventLogger
     {
         //get the matrix log config info from the properties file
         $this->appLoggerConfig = $matrix_agents_properties["matrix-Log-config"];
         return $this;
     }
 
-    public function debugEvent(): EventLogger
+    public function debugEvent() : EventLogger
     {
         $this->debugEvent = true;
         $this->regularInfoLogEvent = false;
@@ -72,7 +72,7 @@ class EventLogger
         return $this;
     }
 
-    public function securityEvent(): EventLogger
+    public function securityEvent() : EventLogger
     {
         $this->securityEvent = true;
         $this->regularInfoLogEvent = false;
@@ -82,7 +82,7 @@ class EventLogger
         return $this;
     }
 
-    public function errorEvent(): EventLogger
+    public function errorEvent() : EventLogger
     {
         $this->errorEvent = true;
         $this->regularInfoLogEvent = false;
@@ -92,7 +92,7 @@ class EventLogger
         return $this;
     }
 
-    public function warningEvent(): EventLogger
+    public function warningEvent() : EventLogger
     {
         $this->warningEvent = true;
         $this->regularInfoLogEvent = false;

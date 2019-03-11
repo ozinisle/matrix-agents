@@ -4,6 +4,7 @@ use MatrixAgentsAPI\Security\JWT\Token;
 use MatrixAgentsAPI\Utilities\EventLogger;
 use MatrixAgentsAPI\Security\Encryption\OpenSSLEncryption;
 use MatrixAgentsAPI\Security\Models\MatrixRegistrationResponseModel;
+use MatrixAgentsAPI\DatabaseModel\UserTableTransactions;
 
 class Authenticator
 {
@@ -11,7 +12,7 @@ class Authenticator
     private $authenticatedUserName = '';
     private $opensslEncryption;
 
-    private $matrix_agents_properties;
+    private $iRememberProperties;
     private $login_pay_load = null;
 
     const MASK_LOG_TRUE = false;
@@ -22,7 +23,7 @@ class Authenticator
         $this->opensslEncryption = new OpenSSLEncryption();
     }
 
-    public function register(): string
+    public function register() : string
     {
 
         //create the response object
@@ -48,16 +49,15 @@ class Authenticator
                 return $decryptedRegistrationRequest;
             }
 
-
-
             if ($decryptedRegistrationRequest->appName === "iRemember") {
                 $this->logger->debug(' ****** Register with iRemember app ****** user name>>> ***' .
                     $decryptedRegistrationRequest->username
                     . '**** password **** ' . $decryptedRegistrationRequest->password, self::MASK_LOG_TRUE);
-            }
 
-            //techdotm_iRemNRMLSub
-            //1PqD-(bTF[_3
+                $usrTabl = new UserTableTransactions();
+                $usrTabl->setIRememberProperties($this->iRememberProperties);
+                $usrTabl->addUser($decryptedRegistrationRequest->username, $decryptedRegistrationRequest->password, 'NRML');
+            }
 
             $registrationResponse->setStatus('SUCCESS')
                 ->setDisplayMessage('User registration is successful')
@@ -71,13 +71,14 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-        } finally {
+        }
+        finally {
             $this->logger->debug(' executing finally block in register() method', self::MASK_LOG_TRUE);
             return $this->getEncryptedResponse($registrationResponse->getJsonString());
         }
     }
 
-    private function getRequest(): string
+    private function getRequest() : string
     {
         $decryptedRequest = null;
         try {
@@ -100,7 +101,7 @@ class Authenticator
         return $decryptedRequest;
     }
 
-    private function getEncryptedResponse($response): string
+    private function getEncryptedResponse($response) : string
     {
         try {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $response);
@@ -114,7 +115,7 @@ class Authenticator
         return null;
     }
 
-    public function login(): string
+    public function login() : string
     {
 
         try {
@@ -174,7 +175,7 @@ class Authenticator
             //END :: gather data relevant to the login attempt         
 
             //get the allowed origins list
-            $allowedOrigins = $this->matrix_agents_properties["matrix-login-allowed-from-origins"];
+            $allowedOrigins = $this->iRememberProperties["matrix-login-allowed-from-origins"];
 
             $this->logger->debug('>>> checking for allowed origins ', self::MASK_LOG_TRUE);
 
@@ -251,12 +252,13 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log(PHP_EOL);
-        } finally {
+        }
+        finally {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $loginResponseToBeSent);
         }
     }
 
-    public function logoff(): string
+    public function logoff() : string
     {
         if (isset($_SESSION['secretKey'])) {
 
@@ -302,17 +304,17 @@ class Authenticator
             $PROCESS_SECTIONS = true;
 
             //get app properties
-            $this->matrix_agents_properties = parse_ini_file(realpath('../matrix-agents-properties.ini'), $PROCESS_SECTIONS);
+            $this->iRememberProperties = parse_ini_file(realpath('../i-remember-properties.ini'), $PROCESS_SECTIONS);
 
-            $matrixAppFlags = $this->matrix_agents_properties['matrix-app-flags'];
+            $matrixAppFlags = $this->iRememberProperties['matrix-app-flags'];
             $_SESSION['debug_mode'] = $matrixAppFlags['debug_mode'];
 
-            $matrixCommChannelPassPhrase = $this->matrix_agents_properties['matrix-comm-channel-pass-phrase'];
+            $matrixCommChannelPassPhrase = $this->iRememberProperties['matrix-comm-channel-pass-phrase'];
             $_SESSION['request_decryption_pass_phrase'] = $matrixCommChannelPassPhrase['request_decryption_pass_phrase'];
             $_SESSION['response_encryption_pass_phrase'] = $matrixCommChannelPassPhrase['response_encryption_pass_phrase'];
 
-            $matrixDatabaseConfiguration = $this->matrix_agents_properties['database-configuration'];
-            $_SESSION['matrix_database_name'] = $matrixDatabaseConfiguration['matrix_database_name'];
+            // $matrixDatabaseConfiguration = $this->iRememberProperties['database-configuration'];
+            // $_SESSION['matrix_database_name'] = $matrixDatabaseConfiguration['matrix_database_name'];
 
             $this->logger->debug(' completed method Authenticator::initializeSession()', self::MASK_LOG_TRUE);
         } catch (Exception $e) {
@@ -323,7 +325,7 @@ class Authenticator
         }
     }
 
-    private function validateUserLoginWithDBData($username, $password): bool
+    private function validateUserLoginWithDBData($username, $password) : bool
     {
         try {
             $this->logger->debug(' into method Authenticator::validateUserLoginWithDBData()', self::MASK_LOG_TRUE);
@@ -570,7 +572,8 @@ class Authenticator
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . $e->getMessage() . "\n");
-        } finally {
+        }
+        finally {
             return $this->login_pay_load;
         }
     }
