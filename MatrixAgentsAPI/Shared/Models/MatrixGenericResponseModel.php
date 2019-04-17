@@ -2,41 +2,52 @@
 
 use MatrixAgentsAPI\Shared\Models\Interfaces\MatrixGenericResponseModelInterface;
 
-
 class MatrixGenericResponseModel implements MatrixGenericResponseModelInterface
 {
     private $status; // SUCCESS or FAILURE
     private $errorMessage;
     private $displayMessage;
+    private $responseCode;
 
-    public function getStatus() : string
+    public function getResponseCode(): string
+    {
+        return $this->responseCode;
+    }
+
+    public function setResponseCode(string $responseCode): MatrixGenericResponseModelInterface
+    {
+        $this->responseCode = $responseCode;
+        return $this;
+    }
+
+    public function getStatus(): string
     {
         return $this->status;
     }
 
-    public function setStatus($status) : MatrixGenericResponseModel
+    public function setStatus(string $status): MatrixGenericResponseModelInterface
     {
         $this->status = $status;
         return $this;
     }
 
-    public function getErrorMessage() : string
+    public function getErrorMessage(): string
     {
         return $this->errorMessage;
     }
 
-    public function setErrorMessage($errorMessage) : MatrixGenericResponseModel
+    public function setErrorMessage(string $errorMessage): MatrixGenericResponseModelInterface
     {
         $this->errorMessage = $errorMessage;
         return $this;
     }
 
-    public function getDisplayMessage() : string
+    public function getDisplayMessage(): string
     {
         return $this->displayMessage;
     }
 
-    public function setDisplayMessage($displayMessage) : MatrixGenericResponseModel
+    public function setDisplayMessage(string $displayMessage): MatrixGenericResponseModelInterface
     {
         $this->displayMessage = $displayMessage;
         return $this;
@@ -48,7 +59,7 @@ class MatrixGenericResponseModel implements MatrixGenericResponseModelInterface
         return get_object_vars($this);
     }
 
-    public function getJsonString() : string
+    public function getJsonString(): string
     {
         //returns the json string equivalent of the current class object
         return json_encode(get_object_vars($this));

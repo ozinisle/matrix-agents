@@ -5,6 +5,8 @@ use MatrixAgentsAPI\Utilities\EventLogger;
 use MatrixAgentsAPI\Security\Encryption\OpenSSLEncryption;
 use MatrixAgentsAPI\Security\Models\MatrixRegistrationResponseModel;
 use MatrixAgentsAPI\DatabaseModel\UserTableTransactions;
+use MatrixAgentsAPI\DatabaseModel\DBConstants;
+use MatrixAgentsAPI\Modules\Login\Model\LoginResponseModel;
 
 class Authenticator
 {
@@ -15,6 +17,10 @@ class Authenticator
     private $iRememberProperties;
     private $login_pay_load = null;
 
+    private $constStatusFlags = DBConstants::StatusFlags;
+    private $constResponseCode = DBConstants::ResponseCode;
+    private $constDisplayMessages = DBConstants::DisplayMessages;
+
     const MASK_LOG_TRUE = false;
 
     public function __construct()
@@ -23,11 +29,13 @@ class Authenticator
         $this->opensslEncryption = new OpenSSLEncryption();
     }
 
-    public function register() : string
+    public function register(): string
     {
 
         //create the response object
         $registrationResponse = new MatrixRegistrationResponseModel();
+        $displayMessage = 'The service is temporarily unavailable. Please contact the support team to seek help in this regard';
+        $responseCode = $this->constResponseCode['RegistrationFailure'];
 
         try {
             $this->logger->debug('into method register >>> ', self::MASK_LOG_TRUE);
@@ -56,52 +64,26 @@ class Authenticator
 
                 $usrTabl = new UserTableTransactions();
                 $usrTabl->setIRememberProperties($this->iRememberProperties);
-                $usrTabl->addUser($decryptedRegistrationRequest->username, $decryptedRegistrationRequest->password, 'NRML');
-            }
 
-            $registrationResponse->setStatus('SUCCESS')
-                ->setDisplayMessage('User registration is successful')
-                ->setErrorMessage('');
+                $registrationResponse = $usrTabl->addUser($decryptedRegistrationRequest->username, $decryptedRegistrationRequest->password, 'NRML');
+            }
         } catch (Exception $e) {
 
             $registrationResponse->setStatus('FAILURE')
-                ->setDisplayMessage('Error occured')
-                ->setErrorMessage($e->getMessage());
+                ->setDisplayMessage($displayMessage)
+                ->setErrorMessage(var_export($e, true))
+                ->setResponseCode($this->constResponseCode['RegistrationFailure']);
 
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
-        }
-        finally {
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
+        } finally {
             $this->logger->debug(' executing finally block in register() method', self::MASK_LOG_TRUE);
             return $this->getEncryptedResponse($registrationResponse->getJsonString());
         }
     }
 
-    private function getRequest() : string
-    {
-        $decryptedRequest = null;
-        try {
-            $this->logger->debug(' into method Authenticator::getRequest()', self::MASK_LOG_TRUE);
-
-            //compiler gets here only if the  request is from a valid origin
-            //get the request body to extract the parameters posted to the request
-            $request_body = $this->getRequestBody();
-
-            $decryptedRequest = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
-
-            $this->logger->debug(' decrypted request payload is >>>' . json_encode($decryptedRequest), self::MASK_LOG_TRUE);
-        } catch (Exception $e) {
-
-            $this->logger
-                ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
-        }
-        $this->logger->debug('>>> completed method Authenticator::getRequest()', self::MASK_LOG_TRUE);
-        return $decryptedRequest;
-    }
-
-    private function getEncryptedResponse($response) : string
+    private function getEncryptedResponse($response): string
     {
         try {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $response);
@@ -109,17 +91,15 @@ class Authenticator
 
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
 
         return null;
     }
 
-    public function login() : string
+    public function login(): string
     {
-
         try {
-
             //initializing default login response to aunthentication failure scenario
             $loginResponseToBeSent = "{\"isAuthenticate\":\"false\"}";
 
@@ -154,71 +134,30 @@ class Authenticator
                 return $loginResponseToBeSent;
             }
 
-
-            // $this->logger->debug('login getRequest() >>> ' . $decryptedRequest, self::MASK_LOG_TRUE);
-
-            // START : mcrypt_decrypt method
-            // Following decryption procedure shall be used for mcrypt_decrypt mechanism for php 5.2 or less
-            // $key = pack('H*', "bcb04b7e103a0cd8b54763051cef08bc55abe029fdebae5e1d417e2ffb2a00a3");
-            // $ciphertext_dec = base64_decode($request_body);
-            // $iv_dec = pack('H*', "101112131415161718191a1b1c1d1e1f");
-
-            // $ciphertext_dec = substr($ciphertext_dec, 16);
-            // $decrypted_requet_body = mcrypt_decrypt(MCRYPT_RIJNDAEL_128, $key, $ciphertext_dec, MCRYPT_MODE_CBC, $iv_dec);
-
-            // get the parameters posted in the request
-            // $data = json_decode($decrypted_request_body);
-            // END : mcrypt_decrypt method
-
             $username = $decryptedRequest->username;
             $password = $decryptedRequest->password;
             //END :: gather data relevant to the login attempt         
 
-            //get the allowed origins list
-            $allowedOrigins = $this->iRememberProperties["matrix-login-allowed-from-origins"];
-
             $this->logger->debug('>>> checking for allowed origins ', self::MASK_LOG_TRUE);
 
-
-            // since this is going to be a mobile application
-            // this can activate custom check cannot help :()
-
-            //loop through the allowed origins and allow user to authenticate only if the origin is good
-            // $canAuthenticate = false;
-            // $referer_upper = strtoupper($referer);
-            // foreach ($allowedOrigins as $origin) {
-            //     $origin_upper = strtoupper($origin);
-            //     if ($origin_upper === substr($referer_upper, 0, strlen($origin_upper))) {
-            //         $canAuthenticate = true;
-            //         break;
-            //     }
-            // }
-            // unset($origin);
-
-            // $this->logger->debug('>>> finished - canAuthenticate is >>> ' . $canAuthenticate, self::MASK_LOG_TRUE);
-            // //dont let user to authenticate if the request did not come from allowed origins list
-            // if (!$canAuthenticate) {
-            //     $this->logger
-            //         ->securityEvent()
-            //         ->log("Alert :: Login has been attempted from url '" . $referer . "' using the following credentials, " . PHP_EOL .
-            //             " username :" . $username . "," . PHP_EOL .
-            //             " password :" . $password . PHP_EOL .
-            //             " The request that was submitted is as follows >>> " . PHP_EOL .
-            //             $request_body);
-
-            //     return $loginResponseToBeSent;
-            // }
-
             //validate the data against the information stored in the data base 
+            $usrTabl = new UserTableTransactions();
+            $usrTabl->setIRememberProperties($this->iRememberProperties);
 
-            if ($this->validateUserLoginWithDBData($username, $password) == true) {
+            $loginResponse = new LoginResponseModel();
+            $loginResponse = $usrTabl->getUser($username, $password);
+
+            $this->logger->debug('Authenticator >>> login >>> loginResponse is' . var_export($loginResponse, true), self::MASK_LOG_TRUE);
+
+
+            if ($loginResponse->getStatus() == $this->constStatusFlags['Success']) {
                 //if validation is succeeds authenticate the user and send an JWT token for future communication authentication
 
-                $userId = "123";
+                $userId = $loginResponse->getUserRecord()->getUserId();
                 $secretKey = $this->getJwtSecretKey();
                 $expiration = date("Y-m-d H:i:s", strtotime('+2 hours'));
                 $issuer = "http://www.techdotmasterpiece.com";
-                $audience = "http://www.techdotmasterpiece.com/matrix/login";
+                $audience = "http://www.techdotmasterpiece.com/products/iRemember/login";
                 $subject = 'user-session-authorization';
 
                 $token = Token::getToken($userId, $secretKey, $expiration, $issuer, $audience, $subject);
@@ -239,7 +178,8 @@ class Authenticator
                         " The request that was submitted is as follows >>> " . PFP_EOL .
                         $request_body);
                 //if validation fails dont let the user to authenticate
-                $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
+                $loginResponseToBeSent = "{\"isAuthenticated\":\"false\",\"displayMessage\":\""
+                    . $this->constDisplayMessages['LoginIncorrectUserNamePassword'] . "\"}";
             }
         } catch (Exception $e) {
             $loginResponseToBeSent = "{\"isAuthenticated\":\"false\"}";
@@ -248,17 +188,16 @@ class Authenticator
                 ->log('Caught exception: ');
             $this->logger
                 ->errorEvent()
-                ->log($e->getMessage());
+                ->log(var_export($e, true));
             $this->logger
                 ->errorEvent()
                 ->log(PHP_EOL);
-        }
-        finally {
+        } finally {
             return $this->opensslEncryption->CryptoJSAesEncrypt($_SESSION['response_encryption_pass_phrase'], $loginResponseToBeSent);
         }
     }
 
-    public function logoff() : string
+    public function logoff(): string
     {
         if (isset($_SESSION['secretKey'])) {
 
@@ -321,24 +260,8 @@ class Authenticator
 
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
-    }
-
-    private function validateUserLoginWithDBData($username, $password) : bool
-    {
-        try {
-            $this->logger->debug(' into method Authenticator::validateUserLoginWithDBData()', self::MASK_LOG_TRUE);
-            //write code to validate user login info with data stored in db
-            $this->authenticatedUserName = "Vishwa Muneeswaran";
-            $this->logger->debug(' completed method Authenticator::validateUserLoginWithDBData()', self::MASK_LOG_TRUE);
-        } catch (Exception $e) {
-
-            $this->logger
-                ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
-        }
-        return true;
     }
 
     private function getJWT($payload)
@@ -382,7 +305,7 @@ class Authenticator
 
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
     }
 
@@ -503,7 +426,7 @@ class Authenticator
 
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
     }
 
@@ -533,9 +456,10 @@ class Authenticator
         } catch (Exception $e) {
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
     }
+
     /**
      * get access token from header
      * */
@@ -555,7 +479,7 @@ class Authenticator
         } catch (Exception $e) {
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
         }
     }
 
@@ -571,9 +495,8 @@ class Authenticator
         } catch (Exception $e) {
             $this->logger
                 ->errorEvent()
-                ->log('Caught exception: ' . $e->getMessage() . "\n");
-        }
-        finally {
+                ->log('Caught exception: ' . var_export($e, true) . "\n");
+        } finally {
             return $this->login_pay_load;
         }
     }
