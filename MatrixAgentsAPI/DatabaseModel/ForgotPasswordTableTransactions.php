@@ -3,10 +3,10 @@
 use MatrixAgentsAPI\Utilities\EventLogger;
 use MatrixAgentsAPI\Security\Models\MatrixRegistrationResponseModel;
 use MatrixAgentsAPI\DatabaseModel\DBConstants;
-use MatrixAgentsAPI\Modules\Login\Model\LoginResponseModel;
-use MatrixAgentsAPI\Modules\Login\Model\LoginUserRecord;
+use MatrixAgentsAPI\Modules\Login\Model\GenericTableTransactionResponseModel;
 
-class UserTableTransactions
+
+class ForgotPasswordTableTransactions
 {
 
     private $logger;
@@ -48,7 +48,7 @@ class UserTableTransactions
     {
         $dbConfig = null;
         try {
-            $this->logger->debug('UserTableTransactions >>> into getIRememberDBProperties method ', self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> into getIRememberDBProperties method ', self::MASK_LOG_TRUE);
             $iremProps = $this->getIRememberProperties();
             $dbConfig = $iremProps['database-configuration'];
             $this->serverName = $dbConfig['iRemember_servername'];
@@ -60,7 +60,7 @@ class UserTableTransactions
                 ->errorEvent()
                 ->log('Caught exception: ' . var_export($e, true) . "\n");
         } finally {
-            $this->logger->debug('UserTableTransactions >>> out of getIRememberDBProperties method ', self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> out of getIRememberDBProperties method ', self::MASK_LOG_TRUE);
             return $dbConfig;
         }
     }
@@ -69,18 +69,18 @@ class UserTableTransactions
 
     private function disConnect()
     {
-        $this->logger->debug('UserTableTransactions >>> into  disConnect method ', self::MASK_LOG_TRUE);
+        $this->logger->debug('ForgotPasswordTableTransactions >>> into  disConnect method ', self::MASK_LOG_TRUE);
 
         $this->dbConnection = null;
 
-        $this->logger->debug('UserTableTransactions >>> out of  disConnect method', self::MASK_LOG_TRUE);
+        $this->logger->debug('ForgotPasswordTableTransactions >>> out of  disConnect method', self::MASK_LOG_TRUE);
     }
 
-    public function getUser($username, $password)
+    public function checkUserEntry($username, $password)
     {
-        $loginResponse = new LoginResponseModel();
+        $queryResponse = new GenericTableTransactionResponseModel();
         try {
-            $this->logger->debug('UserTableTransactions >>> into of getUser method', self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> into of getUser method', self::MASK_LOG_TRUE);
 
             $dbConfig = $this->getIRememberDBProperties();
 
@@ -95,17 +95,14 @@ class UserTableTransactions
                 echo "Failed to connect to MySQL: " . mysqli_connect_error();
             }
 
-            $irem_usr_username = mysqli_real_escape_string($conn, $username);
-            $irem_usr_username = filter_var($irem_usr_username, FILTER_SANITIZE_EMAIL);
-            $irem_usr_username = filter_var($irem_usr_username, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            $irem_fp_username = mysqli_real_escape_string($conn, $username);
+            $irem_fp_username = filter_var($irem_fp_username, FILTER_SANITIZE_EMAIL);
+            $irem_fp_username = filter_var($irem_fp_username, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
-            $irem_usr_password = mysqli_real_escape_string($conn, $password);
-            $irem_usr_password = password_hash($irem_usr_password, PASSWORD_DEFAULT, ['cost' => 11]);
-
-            $this->logger->debug("attempting query >>>> SELECT * FROM irem_users WHERE irem_usr_username='$irem_usr_username' LIMIT 1", self::MASK_LOG_TRUE);
+            $this->logger->debug("attempting query >>>> SELECT * FROM irem_forgot_password WHERE irem_fp_username='$irem_fp_username' LIMIT 1", self::MASK_LOG_TRUE);
 
             // check if user already exists
-            $query = mysqli_query($conn, "SELECT * FROM irem_users WHERE irem_usr_username='$irem_usr_username' LIMIT 1");
+            $query = mysqli_query($conn, "SELECT * FROM irem_forgot_password WHERE irem_fp_username='$irem_fp_username' LIMIT 1");
 
             if (!$query) {
                 die('Error: ' . mysqli_error($conn));
@@ -127,27 +124,25 @@ class UserTableTransactions
                         ->setUserName($userRecord['irem_usr_username'])
                         ->setUserRole($userRecord['irem_usr_userrole']);
 
+                    // $this->logger->debug('test2 >>>' . DBConstants::StatusFlags->Success, self::MASK_LOG_TRUE);
+                    // $this->logger->debug('test2.1 >>>' . $this->constResponseCode['LoginSuccess'], self::MASK_LOG_TRUE);
 
-                    $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Success'])
+
+
+                    $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Success'])
                         ->setDisplayMessage('')
                         ->setErrorMessage('')
                         ->setResponseCode($this->constResponseCode['LoginSuccess'])
                         ->setUserRecord($userRecordModel);
 
                     $this->logger->debug('test3 >>>'
-                        . var_export($loginResponse, true), self::MASK_LOG_TRUE);
-                } else {
-                    $this->logger->debug('passwords are not matching', self::MASK_LOG_TRUE);
-                    $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Failure'])
-                        ->setDisplayMessage($this->constDisplayMessages['LoginIncorrectUserNamePassword'])
-                        ->setErrorMessage('')
-                        ->setResponseCode($this->constResponseCode['LoginIncorrectUserNamePassword']);
-                }
+                        . var_export($queryResponse, true), self::MASK_LOG_TRUE);
+                } else { }
             } else {
 
                 $this->logger->debug('no user found >>> ' . $irem_usr_username, self::MASK_LOG_TRUE);
 
-                $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Failure'])
+                $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Failure'])
                     ->setDisplayMessage($this->constDisplayMessages['LoginIncorrectUserNamePassword'])
                     ->setErrorMessage('')
                     ->setResponseCode($this->constResponseCode['LoginFailure']);
@@ -158,22 +153,22 @@ class UserTableTransactions
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . var_export($e, true) . "\n");
-            $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Failure'])
+            $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Failure'])
                 ->setDisplayMessage($this->constDisplayMessages['TemporaryServiceDownMessage'])
                 ->setErrorMessage(var_export($e, true))
                 ->setResponseCode($this->constResponseCode['RegistrationFailure']);
         } finally {
-            // $this->logger->debug('Authenticator >>> login >>> loginResponse is' . var_export($loginResponse, true), self::MASK_LOG_TRUE);
-            $this->logger->debug('UserTableTransactions >>> out of getUser method ', self::MASK_LOG_TRUE);
-            return $loginResponse;
+            // $this->logger->debug('Authenticator >>> login >>> queryResponse is' . var_export($queryResponse, true), self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> out of getUser method ', self::MASK_LOG_TRUE);
+            return $queryResponse;
         }
     }
 
     public function isUser($username)
     {
-        $loginResponse = new LoginResponseModel();
+        $queryResponse = new LoginResponseModel();
         try {
-            $this->logger->debug('UserTableTransactions >>> into of getUser method', self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> into of getUser method', self::MASK_LOG_TRUE);
 
             $dbConfig = $this->getIRememberDBProperties();
 
@@ -214,7 +209,12 @@ class UserTableTransactions
                     ->setUserName($userRecord['irem_usr_username'])
                     ->setUserRole($userRecord['irem_usr_userrole']);
 
-                $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Success'])
+                // $this->logger->debug('test2 >>>' . DBConstants::StatusFlags->Success, self::MASK_LOG_TRUE);
+                // $this->logger->debug('test2.1 >>>' . $this->constResponseCode['LoginSuccess'], self::MASK_LOG_TRUE);
+
+
+
+                $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Success'])
                     ->setDisplayMessage('')
                     ->setErrorMessage('')
                     ->setResponseCode($this->constResponseCode['LoginSuccess'])
@@ -223,7 +223,7 @@ class UserTableTransactions
 
                 $this->logger->debug('no user found >>> ' . $irem_usr_username, self::MASK_LOG_TRUE);
 
-                $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Failure'])
+                $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Failure'])
                     ->setDisplayMessage($this->constDisplayMessages['LoginIncorrectUserNamePassword'])
                     ->setErrorMessage('')
                     ->setResponseCode($this->constResponseCode['LoginFailure']);
@@ -234,26 +234,25 @@ class UserTableTransactions
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . var_export($e, true) . "\n");
-            $loginResponse = $loginResponse->setStatus($this->constStatusFlags['Failure'])
+            $queryResponse = $queryResponse->setStatus($this->constStatusFlags['Failure'])
                 ->setDisplayMessage($this->constDisplayMessages['TemporaryServiceDownMessage'])
                 ->setErrorMessage(var_export($e, true))
                 ->setResponseCode($this->constResponseCode['RegistrationFailure']);
         } finally {
-            // $this->logger->debug('Authenticator >>> login >>> loginResponse is' . var_export($loginResponse, true), self::MASK_LOG_TRUE);
-            $this->logger->debug('UserTableTransactions >>> out of getUser method ', self::MASK_LOG_TRUE);
-            return $loginResponse;
+            // $this->logger->debug('Authenticator >>> login >>> queryResponse is' . var_export($queryResponse, true), self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> out of getUser method ', self::MASK_LOG_TRUE);
+            return $queryResponse;
         }
     }
 
-    public function addUser($username, $password, $userrole)
+    public function addForgotPasswordEntry($username)
     {
-        $registrationResponse = new MatrixRegistrationResponseModel();
-        $returnValueText = $this->constDisplayMessages['TemporaryServiceDownMessage'];
+        $addForgotPasswordEntryResponse = new GenericTableTransactionResponseModel();
         try {
-            $this->logger->debug('UserTableTransactions >>> into of addUser method', self::MASK_LOG_TRUE);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> into of addForgotPasswordEntry method', self::MASK_LOG_TRUE);
 
-            $registrationResponse->setStatus($this->constStatusFlags['Success'])
-                ->setDisplayMessage($returnValueText)
+            $addForgotPasswordEntryResponse->setStatus('SUCCESS')
+                ->setDisplayMessage($this->constDisplayMessages['TemporaryServiceDownMessage'])
                 ->setErrorMessage('')
                 ->setResponseCode($this->constResponseCode['RegistrationFailure']);
 
@@ -272,62 +271,43 @@ class UserTableTransactions
             }
 
             // new row details
-            $irem_usr_userid = uniqid();
-            $irem_usr_username = mysqli_real_escape_string($conn, $username);
-            $irem_usr_username = filter_var($irem_usr_username, FILTER_SANITIZE_EMAIL);
-            $irem_usr_username = filter_var($irem_usr_username, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+            $irem_fp_index = uniqid();
+            $irem_fp_username = mysqli_real_escape_string($conn, $username);
+            $irem_fp_username = filter_var($irem_fp_username, FILTER_SANITIZE_EMAIL);
+            $irem_fp_username = filter_var($irem_fp_username, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
-            $irem_usr_password = mysqli_real_escape_string($conn, $password);
-            $irem_usr_password = password_hash($irem_usr_password, PASSWORD_DEFAULT, ['cost' => 11]);
+            $irem_fp_accesskey = uniqid();
+            $irem_fp_date = date('Y-m-d h:m:s');
 
-            $irem_usr_userrole = mysqli_real_escape_string($conn, $userrole);
+            $this->logger->debug('ForgotPasswordTableTransactions >>> attempting query >>> ' . "INSERT INTO irem_forgot_password (irem_fp_index, irem_fp_username, irem_fp_accesskey,irem_fp_date)
+                VALUES ('$irem_fp_index','$irem_fp_username','$irem_fp_accesskey','$irem_fp_date')", self::MASK_LOG_TRUE);
 
-            // check if user already exists
 
-            $query = mysqli_query($conn, "SELECT * FROM irem_users WHERE irem_usr_username='$irem_usr_username' LIMIT 1");
+            mysqli_query($conn, "INSERT INTO irem_forgot_password (irem_fp_index, irem_fp_username, irem_fp_accesskey,irem_fp_date)
+                VALUES ('$irem_fp_index','$irem_fp_username','$irem_fp_accesskey','$irem_fp_date')");
 
-            if (!$query) {
-                die('Error: ' . mysqli_error($conn));
-            }
-
-            if (mysqli_num_rows($query) > 0) {
-
-                $this->logger->debug('result is ' . var_export($query, true), self::MASK_LOG_TRUE);
-                $returnValueText = $this->constDisplayMessages['RegistrationUserNameExists'];
-                $registrationResponse->setStatus($this->constStatusFlags['Failure'])
-                    ->setDisplayMessage($returnValueText)
-                    ->setErrorMessage('')
-                    ->setResponseCode($this->constDisplayMessages['RegistrationNameAlreadyExists']);
-            } else {
-
-                $irem_usr_created = date('Y-m-d h:m:s');
-                $irem_usr_lastupdated = date('Y-m-d h:m:s');
-
-                mysqli_query($conn, "INSERT INTO irem_users (irem_usr_userid, irem_usr_username, irem_usr_password,irem_usr_userrole,irem_usr_created,irem_usr_lastupdated)
-                VALUES ('$irem_usr_userid','$irem_usr_username','$irem_usr_password','$irem_usr_userrole','$irem_usr_created','$irem_usr_lastupdated')");
-
-                $returnValueText = 'User registration is successful';
-                $registrationResponse->setStatus($this->constStatusFlags['Success'])
-                    ->setDisplayMessage($returnValueText)
-                    ->setErrorMessage('')
-                    ->setResponseCode($this->constResponseCode['RegistrationSuccess']);
-            }
-
-            $this->logger->debug('display text >>> ' . $returnValueText, self::MASK_LOG_TRUE);
             mysqli_close($conn);
+
+            $headers = array(
+                "From: $irem_fp_username",
+                "Reply-To: $irem_fp_username",
+                "X-Mailer: PHP/" . PHP_VERSION
+            );
+            $headers = implode("\r\n", $headers);
+            mail($irem_fp_username, 'reset forgotten password', 'content to help reset forgotten password', $headers);
         } catch (Exception $e) {
             $this->logger
                 ->errorEvent()
                 ->log('Caught exception: ' . var_export($e, true) . "\n");
-            $registrationResponse->setStatus($this->constStatusFlags['Failure'])
-                ->setDisplayMessage($returnValueText)
+            $addForgotPasswordEntryResponse->setStatus('Failure')
                 ->setErrorMessage(var_export($e, true))
                 ->setResponseCode($this->constResponseCode['RegistrationFailure']);
         } finally {
             $this->disConnect();
-            $this->logger->debug('UserTableTransactions >>> out of addUser method ', self::MASK_LOG_TRUE);
+            $stmt = null;
+            $this->logger->debug('ForgotPasswordTableTransactions >>> out of addForgotPasswordEntry method ', self::MASK_LOG_TRUE);
 
-            return $registrationResponse;
+            return $addForgotPasswordEntryResponse;
         }
     }
 }
