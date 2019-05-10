@@ -4,10 +4,11 @@ use MatrixAgentsAPI\Security\JWT\Token;
 use MatrixAgentsAPI\Utilities\EventLogger;
 use MatrixAgentsAPI\Security\Encryption\OpenSSLEncryption;
 use MatrixAgentsAPI\Security\Models\MatrixRegistrationResponseModel;
-use MatrixAgentsAPI\DatabaseModel\UserTableTransactions;
+
 use MatrixAgentsAPI\DatabaseModel\DBConstants;
 use MatrixAgentsAPI\Modules\Login\Model\LoginResponseModel;
 use MatrixAgentsAPI\DatabaseModel\ForgotPasswordTableTransactions;
+use MatrixAgentsAPI\DatabaseModel\UserTableTransactions;
 
 class Authenticator
 {

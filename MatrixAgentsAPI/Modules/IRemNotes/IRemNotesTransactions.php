@@ -49,10 +49,6 @@ class IRemNotesTransactions
 
             $decryptedUpdateNoteRequest = $this->opensslEncryption->CryptoJSAesDecrypt($_SESSION['request_decryption_pass_phrase'], $request_body);
 
-            // $this->logger->debug('IRemNotesTransactions >>> decryptedUpdateNoteRequest >>> ' . var_export($decryptedUpdateNoteRequest, true), self::MASK_LOG_TRUE);
-            // $this->logger->debug('IRemNotesTransactions >>> request_headers >>> ' . var_export($request_headers, true), self::MASK_LOG_TRUE);
-
-
             if (empty($decryptedUpdateNoteRequest)) {
                 $this->logger
                     ->errorEvent()
@@ -121,9 +117,6 @@ class IRemNotesTransactions
             $_SESSION['request_decryption_pass_phrase'] = $matrixCommChannelPassPhrase['request_decryption_pass_phrase'];
             $_SESSION['response_encryption_pass_phrase'] = $matrixCommChannelPassPhrase['response_encryption_pass_phrase'];
 
-            // $matrixDatabaseConfiguration = $this->iRememberProperties['database-configuration'];
-            // $_SESSION['matrix_database_name'] = $matrixDatabaseConfiguration['matrix_database_name'];
-
             $this->logger->debug(' completed method IRemNotesTransactions::initializeSession()', self::MASK_LOG_TRUE);
         } catch (Exception $e) {
 
@@ -140,21 +133,6 @@ class IRemNotesTransactions
             //compiler gets here only if the  request is from a valid origin
             //get the request body to extract the parameters posted to the request
             if ($this->login_pay_load === null) {
-                // $this->logger->debug('IRemNotesTransactions >>>  getRequestBody >>> check 1 >>> ', self::MASK_LOG_TRUE);
-                // $this->logger->debug('IRemNotesTransactions >>>  request_method >>> ' . $_SERVER["REQUEST_METHOD"] . ' >>> CONTENT_TYPE >>> ' . $_SERVER["CONTENT_TYPE"], self::MASK_LOG_TRUE);
-                // $this->logger->debug('IRemNotesTransactions >>>  getRequestBody >>> CONTENT_LENGTH >>> ' . $_SERVER["CONTENT_LENGTH"], self::MASK_LOG_TRUE);
-                // if (
-                //     $_SERVER["REQUEST_METHOD"] == "POST" && ($_SERVER["CONTENT_TYPE"] == "application/json" || $_SERVER["CONTENT_TYPE"] == "application/json; charset=UTF-8")
-                // ) {
-                //     $this->logger->debug('IRemNotesTransactions >>>  getRequestBody >>> check 2 >>> ', self::MASK_LOG_TRUE);
-                //     $this->login_pay_load = file_get_contents("php://input", false, stream_context_get_default(), 0, $_SERVER["CONTENT_LENGTH"]);
-
-                //     // $this->login_pay_load = json_decode($_REQUEST["JSON_RAW"], true);
-
-                //     // // merge JSON-Content to $_REQUEST 
-                //     // if (is_array($this->login_pay_load)) $_REQUEST   =  $this->login_pay_load + $_REQUEST;
-                //     $this->logger->debug('IRemNotesTransactions >>>  getRequestBody >>> check 3 >>> ', self::MASK_LOG_TRUE);
-                // }
                 $this->login_pay_load = file_get_contents('php://input');
             }
             $this->logger->debug('IRemNotesTransactions >>>  getRequestBody >>> login_pay_load >>> ' . $this->login_pay_load, self::MASK_LOG_TRUE);

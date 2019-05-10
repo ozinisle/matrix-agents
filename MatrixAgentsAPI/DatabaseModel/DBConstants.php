@@ -32,6 +32,10 @@ class DBConstants
         "SendVerificationEmailSuccess" => "1904250030001",
         "SendVerificationEmailFailure" => "-1904250030002",
 
+        "NewNoteCreatedSuccess" => "1905020040001",
+        "InvalidInputData" => "-1905020040002",
+        "SilentFailure" => "-1905030040003",
+
         "InvalidRequest" => "-1904290990001",
         "RandomError" => "-1904290990002",
         "CodeError" => "-1904290990003",
@@ -41,7 +45,9 @@ class DBConstants
         "TemporaryServiceDownMessage" => "The service is temporarily unavailable. Please contact the support team to seek help in this regard",
         "RegistrationUserNameExists" => "User name already exists. Try forgot password link to recover your password",
         "LoginIncorrectUserNamePassword" => "Incorrect Username or Password",
-        "InvalidRequest" => "Invalid request. No request body information found"
+        "InvalidRequest" => "Invalid request. No request body information found",
+        "InvalidInputData" => "Invalid Input Data",
+        "SilentFailure" => "Code Execution did not complete. Possibly due to syntax or structural errors"
     );
 
     const StatusFlags = array(

@@ -1,16 +1,15 @@
 <?php namespace MatrixAgentsAPI\Shared\Models\Interfaces;
 
-interface MatrixGenericResponseModelInterface
-{
-    public function getStatus(): string;
-    public function setStatus(string $status): MatrixGenericResponseModelInterface;
-    public function getErrorMessage(): string;
-    public function setErrorMessage(string $errorMessage): MatrixGenericResponseModelInterface;
-    public function getDisplayMessage(): string;
-    public function setDisplayMessage(string $displayMessage): MatrixGenericResponseModelInterface;
-    public function getResponseCode(): string;
-    public function setResponseCode(string $responseCode): MatrixGenericResponseModelInterface;
+use MatrixAgentsAPI\Shared\Models\Interfaces\GenericClassMethodsInterface;
 
-    public function getJson();
-    public function getJsonString(): string;
+interface MatrixGenericResponseModelInterface extends GenericClassMethodsInterface
+{
+    function getStatus(): string;
+    function setStatus(string $status): MatrixGenericResponseModelInterface;
+    function getErrorMessage(): string;
+    function setErrorMessage(string $errorMessage): MatrixGenericResponseModelInterface;
+    function getDisplayMessage(): string;
+    function setDisplayMessage(string $displayMessage): MatrixGenericResponseModelInterface;
+    function getResponseCode(): string;
+    function setResponseCode(string $responseCode): MatrixGenericResponseModelInterface;
 }
